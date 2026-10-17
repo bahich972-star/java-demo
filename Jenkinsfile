@@ -2,60 +2,66 @@ pipeline {
     agent {
         docker {
             image 'jenkins-agent-java:latest'
-            args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
+            // Монтируем сокет Docker и конфигурацию kubeconfig
+            args '-u root -v /var/run/docker.sock:/var/run/docker.sock -v /home/marlon/.kube:/root/.kube'
         }
     }
 
     environment {
-        // Замените на ваш Docker Hub логин
         DOCKER_REPO = 'bahich1/java-demo'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
 
-    options {
-        timeout(time: 15, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '10'))
-    }
-
     stages {
+        // ... (стадии Checkout и Build & Test остаются без изменений)
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
         stage('Build & Test') {
             steps {
-                // Собираем и тестируем
                 sh 'mvn -B clean package'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                echo "=== Сборка Docker-образа ${DOCKER_REPO}:${IMAGE_TAG} ==="
                 sh 'docker build -t $DOCKER_REPO:$IMAGE_TAG .'
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
-                echo "=== Отправка образа в Docker Hub ==="
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
                     sh 'docker push $DOCKER_REPO:$IMAGE_TAG'
                 }
             }
         }
+
+        // НОВАЯ СТАДИЯ ДЕПЛОЯ
+        stage('Deploy to Kubernetes') {
+            steps {
+                echo "=== Деплой образа ${IMAGE_TAG} в Minikube ==="
+                // 1. Применяем манифесты (создаем ресурсы, если их нет)
+                sh 'kubectl apply -f k8s/deployment.yaml'
+                sh 'kubectl apply -f k8s/service.yaml'
+                
+                // 2. Обновляем образ на только что собранный
+                sh "kubectl set image deployment/java-demo java-demo=${DOCKER_REPO}:${IMAGE_TAG}"
+                
+                // 3. Ждем, пока Kubernetes завершит обновление (rolling update)
+                sh 'kubectl rollout status deployment/java-demo --timeout=90s'
+            }
+        }
     }
 
     post {
         success {
-            echo '✅ Сборка, тесты и Docker-образ успешно выполнены!'
-            archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+            echo '✅ Пайплайн CI/CD успешно завершен!'
         }
         failure {
-            echo '❌ Сборка провалилась.'
+            echo '❌ Ошибка на одном из этапов.'
         }
     }
 }
