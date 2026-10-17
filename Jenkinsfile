@@ -8,7 +8,7 @@ pipeline {
 
     environment {
         // Замените на ваш Docker Hub логин
-        DOCKER_REPO = 'bahich1'
+        DOCKER_REPO = 'bahich1/java-demo'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
 
