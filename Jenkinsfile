@@ -2,8 +2,14 @@ pipeline {
     agent {
         docker {
             image 'jenkins-agent-java:latest'
-            args '-u root' // используем root, чтобы избежать проблем с правами на запись в workspace
+            args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
         }
+    }
+
+    environment {
+        // Замените на ваш Docker Hub логин
+        DOCKER_REPO = 'bahich972-star/java-demo'
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
 
     options {
@@ -14,40 +20,42 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo '=== Клонируем репозиторий ==='
                 checkout scm
             }
         }
 
-        stage('Build') {
+        stage('Build & Test') {
             steps {
-                echo '=== Сборка проекта (Maven) ==='
-                sh 'mvn -B clean compile'
+                // Собираем и тестируем
+                sh 'mvn -B clean package'
             }
         }
 
-        stage('Test') {
+        stage('Build Docker Image') {
             steps {
-                echo '=== Запуск тестов ==='
-                sh 'mvn -B test'
+                echo "=== Сборка Docker-образа ${DOCKER_REPO}:${IMAGE_TAG} ==="
+                sh 'docker build -t $DOCKER_REPO:$IMAGE_TAG .'
             }
         }
 
-        stage('Package') {
+        stage('Push to Docker Hub') {
             steps {
-                echo '=== Упаковка артефакта (JAR) ==='
-                sh 'mvn -B package -DskipTests'
+                echo "=== Отправка образа в Docker Hub ==="
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
+                    sh 'docker push $DOCKER_REPO:$IMAGE_TAG'
+                }
             }
         }
     }
 
     post {
         success {
-            echo '✅ Сборка и тесты прошли успешно!'
+            echo '✅ Сборка, тесты и Docker-образ успешно выполнены!'
             archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
         }
         failure {
-            echo '❌ Сборка провалилась. Проверьте логи.'
+            echo '❌ Сборка провалилась.'
         }
     }
 }
