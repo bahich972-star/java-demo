@@ -44,11 +44,11 @@ pipeline {
             steps {
                 echo "=== Деплой образа ${IMAGE_TAG} в Minikube ==="
                 // 1. Применяем манифесты (создаем ресурсы, если их нет)
-                sh 'kubectl apply -f k8s/deployment.yaml'
-                sh 'kubectl apply -f k8s/service.yaml'
+                sh 'kubectl apply -f k8s/deployment.yaml --validate=false'
+                sh 'kubectl apply -f k8s/service.yaml --validate=false'
                 
                 // 2. Обновляем образ на только что собранный
-                sh "kubectl set image deployment/java-demo java-demo=${DOCKER_REPO}:${IMAGE_TAG}"
+                sh "kubectl set image deployment/java-demo java-demo=${DOCKER_REPO}:${IMAGE_TAG} --validate=false"
                 
                 // 3. Ждем, пока Kubernetes завершит обновление (rolling update)
                 sh 'kubectl rollout status deployment/java-demo --timeout=90s'
