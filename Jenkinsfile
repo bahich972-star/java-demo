@@ -35,6 +35,9 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
                     sh 'docker push $DOCKER_REPO:$IMAGE_TAG'
+			
+		    sh 'docker tag $DOCKER_REPO:$IMAGE_TAG $DOCKER_REPO:latest'
+		    sh 'docker push $DOCKER_REPO:latest'
                 }
             }
         }
@@ -51,7 +54,7 @@ pipeline {
                 sh "kubectl set image deployment/java-demo java-demo=${DOCKER_REPO}:${IMAGE_TAG}"
                 
                 // 3. Ждем, пока Kubernetes завершит обновление (rolling update)
-                sh 'kubectl rollout status deployment/java-demo --timeout=90s'
+                sh 'kubectl rollout status deployment/java-demo --timeout=300s'
             }
         }
     }
