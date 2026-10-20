@@ -48,7 +48,7 @@ pipeline {
                 sh 'kubectl apply -f k8s/service.yaml --validate=false'
                 
                 // 2. Обновляем образ на только что собранный
-                sh "kubectl set image deployment/java-demo java-demo=${DOCKER_REPO}:${IMAGE_TAG} --validate=false"
+                sh "kubectl set image deployment/java-demo java-demo=${DOCKER_REPO}:${IMAGE_TAG}"
                 
                 // 3. Ждем, пока Kubernetes завершит обновление (rolling update)
                 sh 'kubectl rollout status deployment/java-demo --timeout=90s'
