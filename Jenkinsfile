@@ -54,7 +54,7 @@ pipeline {
                 sh "kubectl set image deployment/java-demo java-demo=${DOCKER_REPO}:${IMAGE_TAG}"
                 
                 // 3. Ждем, пока Kubernetes завершит обновление (rolling update)
-                sh 'kubectl rollout status deployment/java-demo --timeout=300s'
+                sh 'kubectl rollout status deployment/java-demo --timeout=90s'
             }
         }
     }
