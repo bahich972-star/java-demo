@@ -3,7 +3,7 @@ pipeline {
         docker {
             image 'jenkins-agent-java:latest'
             // Монтируем сокет Docker и конфигурацию kubeconfig
-            args '-u root -v /var/run/docker.sock:/var/run/docker.sock -v /home/marlon/.kube:/root/.kube'
+            args '-u root -v /var/run/docker.sock:/var/run/docker.sock -v /home/marlon/.kube:/root/.kube -v /home/marlon/.minikube:/root/.minikube'
         }
     }
 
