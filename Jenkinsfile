@@ -43,14 +43,14 @@ pipeline {
         }
 
 
-stage('Upload to RustFS') {
+
+    stage('Upload to RustFS') {
         steps {
             withCredentials([usernamePassword(credentialsId: 'rustfs-creds', 
                                               usernameVariable: 'RUSTFS_USER', 
                                               passwordVariable: 'RUSTFS_PASS')]) {
-                // Используем двойные кавычки """ для корректной подстановки переменных Jenkins
                 sh """
-                    echo "🔧 Создаем конфиг rclone..."
+                    echo "🔧 1. Создаем конфиг rclone..."
                     cat > rclone.conf << EOF
 [rustfs]
 type = s3
@@ -60,23 +60,26 @@ access_key_id = ${RUSTFS_USER}
 secret_access_key = ${RUSTFS_PASS}
 EOF
 
-                    echo "📦 Создаем бакет (если его ещё нет)..."
+                    echo "🔍 2. Проверяем содержимое папки target (ищем наш JAR)..."
+                    ls -la ${WORKSPACE}/target/ || echo "⚠️ ВНИМАНИЕ: Папка target пуста или отсутствует!"
+
+                    echo "📦 3. Создаем бакет (если его ещё нет)..."
                     docker run --rm \
                         -v ${WORKSPACE}/rclone.conf:/config/rclone/rclone.conf \
                         rclone/rclone:latest mkdir rustfs:jenkins-artifacts || true
 
-                    echo "🚀 Загружаем артефакт в хранилище..."
+                    echo "🚀 4. Загружаем артефакт в хранилище..."
+                    # Используем --include "*.jar", это надежнее, чем *.jar в shell
                     docker run --rm \
                         -v ${WORKSPACE}:/data \
                         -v ${WORKSPACE}/rclone.conf:/config/rclone/rclone.conf \
-                        rclone/rclone:latest copy /data/target/*.jar rustfs:jenkins-artifacts/builds/${BUILD_NUMBER}/
+                        rclone/rclone:latest copy /data/target/ rustfs:jenkins-artifacts/builds/${BUILD_NUMBER}/ --include "*.jar"
                     
                     echo "✅ Артефакт успешно загружен в RustFS (сборка #${BUILD_NUMBER})"
                 """
             }
         }
     }
-
 
 
 
