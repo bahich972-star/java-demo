@@ -42,6 +42,45 @@ pipeline {
             }
         }
 
+
+  //ОВЫЙ ЭТАП: Загрузка артефакта в RustFS
+    stage('Upload to RustFS') {
+        steps {
+            withCredentials([usernamePassword(credentialsId: 'rustfs-creds', 
+                                              usernameVariable: 'RUSTFS_USER', 
+                                              passwordVariable: 'RUSTFS_PASS')]) {
+                sh '''
+                    // Создаём конфиг rclone
+                    cat > rclone.conf << EOF
+[rustfs]
+type = s3
+provider = Minio
+endpoint = http://172.25.216.9:9000
+access_key_id = ${RUSTFS_USER}
+secret_access_key = ${RUSTFS_PASS}
+EOF
+
+                    // Создаём бакет (если его ещё нет)
+                    docker run --rm \
+                        -v $PWD/rclone.conf:/config/rclone/rclone.conf \
+                        rclone/rclone:latest mkdir rustfs:jenkins-artifacts || true
+
+                    // Загружаем JAR-файл в бакет
+                    docker run --rm \
+                        -v $PWD:/data \
+                        -v $PWD/rclone.conf:/config/rclone/rclone.conf \
+                        rclone/rclone:latest copy /data/target/*.jar rustfs:jenkins-artifacts/builds/${BUILD_NUMBER}/
+                    
+                    echo "✅ Артефакт загружен в RustFS (сборка #${BUILD_NUMBER})"
+                '''
+            }
+        }
+    }
+
+
+
+
+
         // НОВАЯ СТАДИЯ ДЕПЛОЯ
         stage('Deploy to Kubernetes') {
             steps {
