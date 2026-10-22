@@ -43,14 +43,14 @@ pipeline {
         }
 
 
-  //ОВЫЙ ЭТАП: Загрузка артефакта в RustFS
-    stage('Upload to RustFS') {
+stage('Upload to RustFS') {
         steps {
             withCredentials([usernamePassword(credentialsId: 'rustfs-creds', 
                                               usernameVariable: 'RUSTFS_USER', 
                                               passwordVariable: 'RUSTFS_PASS')]) {
-                sh '''
-                    // Создаём конфиг rclone
+                // Используем двойные кавычки """ для корректной подстановки переменных Jenkins
+                sh """
+                    echo "🔧 Создаем конфиг rclone..."
                     cat > rclone.conf << EOF
 [rustfs]
 type = s3
@@ -60,23 +60,22 @@ access_key_id = ${RUSTFS_USER}
 secret_access_key = ${RUSTFS_PASS}
 EOF
 
-                    // Создаём бакет (если его ещё нет)
+                    echo "📦 Создаем бакет (если его ещё нет)..."
                     docker run --rm \
-                        -v $PWD/rclone.conf:/config/rclone/rclone.conf \
+                        -v ${WORKSPACE}/rclone.conf:/config/rclone/rclone.conf \
                         rclone/rclone:latest mkdir rustfs:jenkins-artifacts || true
 
-                    // Загружаем JAR-файл в бакет
+                    echo "🚀 Загружаем артефакт в хранилище..."
                     docker run --rm \
-                        -v $PWD:/data \
-                        -v $PWD/rclone.conf:/config/rclone/rclone.conf \
+                        -v ${WORKSPACE}:/data \
+                        -v ${WORKSPACE}/rclone.conf:/config/rclone/rclone.conf \
                         rclone/rclone:latest copy /data/target/*.jar rustfs:jenkins-artifacts/builds/${BUILD_NUMBER}/
                     
-                    echo "✅ Артефакт загружен в RustFS (сборка #${BUILD_NUMBER})"
-                '''
+                    echo "✅ Артефакт успешно загружен в RustFS (сборка #${BUILD_NUMBER})"
+                """
             }
         }
     }
-
 
 
 
